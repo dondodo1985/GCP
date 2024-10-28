@@ -1,9 +1,12 @@
+task 1
+gcloud auth list
 
+gcloud config list project
 
 
 export PROJECT_ID=$(gcloud config get-value project)
 export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-export REGION=us-central1
+export REGION="${ZONE%-*}"
 gcloud config set compute/region $REGION
 
 gcloud services enable \
@@ -15,7 +18,6 @@ clouddeploy.googleapis.com
 
 
 sleep 20
-
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
 --member=serviceAccount:$(gcloud projects describe $PROJECT_ID \
@@ -33,20 +35,19 @@ gcloud artifacts repositories create cicd-challenge \
 --repository-format=docker \
 --location=$REGION
 
-gcloud container clusters create cd-staging --node-locations=$ZONE --num-nodes=1 --async
-gcloud container clusters create cd-production --node-locations=$ZONE --num-nodes=1 --async
 
+gcloud container clusters create cd-staging --node-locations=us-west1-a --num-nodes=1 --async
+gcloud container clusters create cd-production --node-locations=us-west1-a --num-nodes=1 --async
 
+task 2
 cd ~/
 git clone https://github.com/GoogleCloudPlatform/cloud-deploy-tutorials.git
 cd cloud-deploy-tutorials
 git checkout c3cae80 --quiet
 cd tutorials/base
 
-
 envsubst < clouddeploy-config/skaffold.yaml.template > web/skaffold.yaml
 cat web/skaffold.yaml
-
 
 cd web
 skaffold build --interactive=false \
@@ -54,7 +55,7 @@ skaffold build --interactive=false \
 --file-output artifacts.json
 cd ..
 
-#TASK 3
+task 3
 
 cp clouddeploy-config/delivery-pipeline.yaml.template clouddeploy-config/delivery-pipeline.yaml
 sed -i "s/targetId: staging/targetId: cd-staging/" clouddeploy-config/delivery-pipeline.yaml
@@ -66,30 +67,12 @@ cp clouddeploy-config/delivery-pipeline.yaml.template clouddeploy-config/deliver
 sed -i "s/targetId: staging/targetId: cd-staging/" clouddeploy-config/delivery-pipeline.yaml
 sed -i "s/targetId: prod/targetId: cd-production/" clouddeploy-config/delivery-pipeline.yaml
 sed -i "/targetId: test/d" clouddeploy-config/delivery-pipeline.yaml
+
 gcloud beta deploy apply --file=clouddeploy-config/delivery-pipeline.yaml
 
 gcloud beta deploy delivery-pipelines describe web-app
 
-#!/bin/bash
-
-CLUSTERS=("cd-production" "cd-staging")
-
-for cluster in "${CLUSTERS[@]}"; do
-  status=$(gcloud container clusters describe "$cluster" --format="value(status)")
-  
-  while [ "$status" != "RUNNING" ]; do
-    echo "Waiting for $cluster to be RUNNING..."
-    
-    sleep 10  # Adjust the sleep duration as needed
-    status=$(gcloud container clusters describe "$cluster" --format="value(status)")
-  done
-  
-  echo "$cluster is now RUNNING. Proceeding with the next command."
-  
-  
-done
-
-
+gcloud container clusters list --format="csv(name,status)"
 
 CONTEXTS=("cd-staging" "cd-production" )
 for CONTEXT in ${CONTEXTS[@]}
@@ -109,7 +92,6 @@ envsubst < clouddeploy-config/target-prod.yaml.template > clouddeploy-config/tar
 sed -i "s/staging/cd-staging/" clouddeploy-config/target-cd-staging.yaml
 sed -i "s/prod/cd-production/" clouddeploy-config/target-cd-production.yaml
 
-
 for CONTEXT in ${CONTEXTS[@]}
 do
     envsubst < clouddeploy-config/target-$CONTEXT.yaml.template > clouddeploy-config/target-$CONTEXT.yaml
@@ -117,8 +99,7 @@ do
 done
 
 
-
-
+task 4
 gcloud beta deploy releases create web-app-001 \
 --delivery-pipeline web-app \
 --build-artifacts web/artifacts.json \
@@ -128,70 +109,18 @@ gcloud beta deploy rollouts list \
 --delivery-pipeline web-app \
 --release web-app-001
 
-# Wait for the rollout to complete
-while true; do
-  # Check the rollout status
-  status=$(gcloud beta deploy rollouts list --delivery-pipeline web-app --release web-app-001 --format="value(state)" | head -n 1)
-  
-  # If the status is SUCCESS, break out of the loop
-  if [ "$status" == "SUCCEEDED" ]; then
-    break
-  fi
-  
-  # Wait for a short duration before checking agai
-  echo "it's creating now"
-
-  sleep 10
-done
-
-
+task5 
 gcloud beta deploy releases promote \
 --delivery-pipeline web-app \
 --release web-app-001 \
 --quiet
-
-###
-
-
-# Wait for the rollout to complete
-while true; do
-  # Check the rollout status
-  status=$(gcloud beta deploy rollouts list --delivery-pipeline web-app --release web-app-001 --format="value(state)" | head -n 1)
-  
-  # If the status is SUCCESS, break out of the loop
-  if [ "$status" == "PENDING_APPROVAL" ]; then
-    break
-  fi
-  
-  # Wait for a short duration before checking again
-  echo "it's creating now"
-  sleep 10
-done
-
 
 gcloud beta deploy rollouts approve web-app-001-to-cd-production-0001 \
 --delivery-pipeline web-app \
 --release web-app-001 \
 --quiet
 
-
-# Wait for the rollout to complete
-while true; do
-  # Check the rollout status
-  status=$(gcloud beta deploy rollouts list --delivery-pipeline web-app --release web-app-001 --format="value(state)" | head -n 1)
-  
-  # If the status is SUCCESS, break out of the loop
-  if [ "$status" == "SUCCEEDED" ]; then
-    break
-  fi
-  
-  # Wait for a short duration before checking again
-  echo "it's creating now"
-  sleep 10
-done
-
-
-
+task6
 gcloud services enable cloudbuild.googleapis.com
 
 cd ~/
@@ -214,24 +143,7 @@ gcloud beta deploy releases create web-app-002 \
 --build-artifacts web/artifacts.json \
 --source web/
 
-
-# Wait for the rollout to complete
-while true; do
-  # Check the rollout status
-  status=$(gcloud beta deploy rollouts list --delivery-pipeline web-app --release web-app-002 --format="value(state)" | head -n 1)
-  
-  # If the status is SUCCESS, break out of the loop
-  if [ "$status" == "SUCCEEDED" ]; then
-    break
-  fi
-  
-  # Wait for a short duration before checking agai
-  echo "it's creating now"
-
-  sleep 10
-done
-
-
+task7
 gcloud deploy targets rollback cd-staging \
    --delivery-pipeline=web-app \
    --quiet
