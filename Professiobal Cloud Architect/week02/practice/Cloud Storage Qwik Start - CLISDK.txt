@@ -1,0 +1,21 @@
+Cloud Storage: Qwik Start - CLI/SDK
+
+Create a bucket gsutil mb gs://bucket-ragive4
+
+Upload an object into your bucket  
+-curl https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Ada_Lovelace_portrait.jpg/800px-Ada_Lovelace_portrait.jpg --output ada.jpg 
+-gsutil cp ada.jpg gs://bucket-ragive4
+
+Download an object from your bucket gsutil cp -r gs://bucket-ragive4/ada.jpg .
+
+Copy an object to a folder in the bucket gsutil cp gs://bucket-ragive4/ada.jpg gs://bucket-ragive4/image-folder/
+
+List contents of a bucket or folder gsutil ls gs://bucket-ragive4
+
+List details for an object gsutil ls -l gs://bucket-ragive4/ada.jpg
+
+Make your object publicly accessible gsutil acl ch -u AllUsers:R gs://bucket-ragive4/ada.jpg
+
+Remove public access gsutil acl ch -d AllUsers gs://bucket-ragive4/ada.jpg and refresh
+
+Delete objects gsutil rm gs://bucket-ragive4/ada.jpg
